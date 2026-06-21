@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🎬 YouTube Shorts Automator</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <style>
+    :root {
+      --bg: #0c0c10; --surface: #141420; --card: #1a1a28;
+      --border: #2a2a42; --red: #ff3d3d; --purple: #7c6af7;
+      --green: #22d3a0; --text: #e8e8f8; --muted: #7878a0; --r: 10px;
+    }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family: system-ui,-apple-system,'Segoe UI',sans-serif; background:var(--bg); color:var(--text); padding:20px 16px 80px; }
+    .wrap { max-width: 780px; margin: 0 auto; }
+
+    /* Hero */
+    .hero { text-align:center; padding:34px 24px; background:linear-gradient(160deg,#1a0a0a,#0c1228); border:1px solid var(--border); border-radius:var(--r); margin-bottom:18px; }
+    .hero h1 { font-size:1.85rem; font-weight:800; background:linear-gradient(90deg,#ff5555,#ff9999); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+    .hero p { color:var(--muted); margin-top:6px; font-size:.88rem; }
+    .badges { display:flex; flex-wrap:wrap; gap:6px; justify-content:center; margin-top:12px; }
+    .badge { background:#1a1a30; border:1px solid #2a2a50; padding:3px 12px; border-radius:20px; font-size:.7rem; color:#9090c0; }
+
+    /* Card */
+    .card { background:var(--card); border:1px solid var(--border); border-radius:var(--r); padding:22px; margin-bottom:16px; }
+    .card-head { display:flex; align-items:center; gap:10px; margin-bottom:18px; padding-bottom:14px; border-bottom:1px solid var(--border); }
+    .step { width:28px; height:28px; background:var(--purple); border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:.78rem; font-weight:700; flex-shrink:0; }
+    .card-head h2 { font-size:1rem; font-weight:700; }
+
+    /* Form */
+    label { display:block; font-size:.7rem; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; font-weight:600; margin-bottom:5px; }
+    input,select,textarea { width:100%; background:#0e0e1a; border:1px solid var(--border); color:var(--text); padding:9px 13px; border-radius:7px; font-size:.875rem; outline:none; margin-bottom:12px; transition:border-color .15s; font-family:inherit; }
+    input:focus,select:focus { border-color:var(--purple); }
+    .g2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    .g3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
+
+    /* Buttons */
+    .btn { display:inline-flex; align-items:center; gap:7px; padding:10px 18px; border-radius:8px; font-weight:600; font-size:.875rem; cursor:pointer; border:none; transition:all .15s; }
+    .btn-red { background:linear-gradient(135deg,#ff3333,#cc0000); color:#fff; }
+    .btn-red:hover { transform:translateY(-1px); box-shadow:0 4px 14px rgba(255,40,40,.35); }
+    .btn-purple { background:var(--purple); color:#fff; }
+    .btn-purple:hover { background:#6a59e0; }
+    .btn-full { width:100%; justify-content:center; padding:13px; font-size:.95rem; }
+    .btn:disabled { opacity:.5; cursor:not-allowed; transform:none !important; }
+
+    /* API rows */
+    .api-row { display:flex; align-items:center; background:#111120; border:1px solid var(--border); border-radius:8px; padding:11px 14px; margin-bottom:8px; gap:12px; }
+    .api-icon { font-size:1.25rem; }
+    .api-info { flex:1; }
+    .api-name { font-size:.875rem; font-weight:600; }
+    .api-desc { font-size:.7rem; color:var(--muted); margin-top:1px; }
+    .api-get { background:#1e2840; color:#7090e0; padding:5px 12px; border-radius:6px; font-size:.75rem; text-decoration:none; white-space:nowrap; font-weight:500; }
+    .api-get:hover { background:#283560; }
+
+    /* Preview */
+    .preview { background:#0e0e1a; border:1px solid var(--border); border-radius:7px; padding:14px; margin-bottom:10px; display:none; }
+    .preview.show { display:block; }
+    .preview-lbl { font-size:.68rem; text-transform:uppercase; letter-spacing:1px; color:var(--purple); font-weight:700; margin-bottom:6px; }
+    .preview p { font-size:.875rem; line-height:1.6; }
+    .tags { display:flex; flex-wrap:wrap; gap:4px; }
+    .tag { background:#181830; border:1px solid #2a2a50; padding:2px 10px; border-radius:20px; font-size:.7rem; color:#8080c0; }
+
+    /* Schedule */
+    .slot { background:#0e0e1a; border:1px solid var(--border); border-radius:8px; padding:14px; text-align:center; }
+    .slot label { text-align:center; display:block; margin-bottom:6px; }
+    .slot input[type=time] { text-align:center; margin-bottom:6px; }
+    .slot-toggle { display:flex; align-items:center; justify-content:center; gap:5px; font-size:.78rem; color:var(--muted); }
+    .slot-toggle input[type=checkbox] { width:auto; margin:0; accent-color:var(--purple); }
+
+    /* Info */
+    .info { background:#0a1022; border:1px solid #1a2a55; border-radius:7px; padding:12px 14px; font-size:.82rem; color:#8898bb; line-height:1.6; margin-bottom:14px; }
+    .info strong { color:#a8c0e8; }
+
+    /* Steps */
+    .steps { list-style:none; counter-reset:step; }
+    .steps li { counter-increment:step; padding:10px 0 10px 34px; position:relative; font-size:.86rem; color:#9898b8; border-bottom:1px solid #1a1a28; line-height:1.6; }
+    .steps li:last-child { border-bottom:none; }
+    .steps li::before { content:counter(step); position:absolute; left:0; top:10px; width:22px; height:22px; background:#1a1a38; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:.7rem; font-weight:700; color:var(--purple); }
+    .steps li strong { color:var(--text); }
+    code { background:#0a0a1a; border:1px solid var(--border); padding:1px 6px; border-radius:4px; font-size:.8rem; color:#88ccff; font-family:'Cascadia Code','Fira Code',monospace; }
+
+    /* Spinner */
+    @keyframes spin { to { transform:rotate(360deg); } }
+    .spin { width:14px; height:14px; border:2px solid rgba(255,255,255,.2); border-top-color:#fff; border-radius:50%; animation:spin .6s linear infinite; display:none; }
+    .spin.on { display:inline-block; }
+
+    .footer { position:fixed; bottom:0; left:0; right:0; background:#0a0a14; border-top:1px solid var(--border); padding:8px 20px; font-size:.75rem; color:var(--muted); text-align:center; }
+    a { color:#7090e0; }
+    @media(max-width:580px) { .g2,.g3 { grid-template-columns:1fr; } }
+  </style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="hero">
+    <h1>🎬 YouTube Shorts Automator</h1>
+    <p>AI creates & uploads Shorts to your channel — runs on GitHub 24/7, costs $0</p>
+    <div class="badges">
+      <span class="badge">✅ 100% Free</span>
+      <span class="badge">🤖 Gemini AI</span>
+      <span class="badge">⚡ GitHub Actions</span>
+      <span class="badge">🔊 Neural Voice</span>
+      <span class="badge">🎬 Pexels Video</span>
+      <span class="badge">📱 2-3x Daily</span>
+    </div>
+  </div>
+
+  <!-- STEP 1 -->
+  <div class="card">
+    <div class="card-head"><div class="step">1</div><h2>Get Your Free API Keys</h2></div>
+    <div class="api-row">
+      <span class="api-icon">🤖</span>
+      <div class="api-info">
+        <div class="api-name">Google Gemini API</div>
+        <div class="api-desc">Free · 1,500 requests/day · No credit card · Generates topics, scripts, descriptions</div>
+      </div>
+      <a class="api-get" href="https://aistudio.google.com/app/apikey" target="_blank">Get Free →</a>
+    </div>
+    <div class="api-row">
+      <span class="api-icon">🎬</span>
+      <div class="api-info">
+        <div class="api-name">Pexels API</div>
+        <div class="api-desc">Free · 20,000 req/month · No credit card · Background stock video</div>
+      </div>
+      <a class="api-get" href="https://www.pexels.com/api/" target="_blank">Get Free →</a>
+    </div>
+    <div class="api-row">
+      <span class="api-icon">📺</span>
+      <div class="api-info">
+        <div class="api-name">YouTube Data API v3</div>
+        <div class="api-desc">Free · 10,000 units/day = ~6 uploads · Needs Google Cloud OAuth setup (one-time)</div>
+      </div>
+      <a class="api-get" href="https://console.cloud.google.com/apis/library/youtube.googleapis.com" target="_blank">Enable →</a>
+    </div>
+    <div class="api-row">
+      <span class="api-icon">🔊</span>
+      <div class="api-info">
+        <div class="api-name">edge-tts (Microsoft Neural TTS)</div>
+        <div class="api-desc">Free · No API key · No limit · Premium natural voices (Jenny, Guy, Aria…)</div>
+      </div>
+      <a class="api-get" href="https://pypi.org/project/edge-tts/" target="_blank">Learn →</a>
+    </div>
+    <div class="api-row">
+      <span class="api-icon">⚙️</span>
+      <div class="api-info">
+        <div class="api-name">GitHub Actions</div>
+        <div class="api-desc">Free · Unlimited minutes on public repos · Cron scheduling · Always-on</div>
+      </div>
+      <a class="api-get" href="https://github.com/new" target="_blank">New Repo →</a>
+    </div>
+  </div>
+
+  <!-- STEP 2 -->
+  <div class="card">
+    <div class="card-head"><div class="step">2</div><h2>Configure & Preview Content</h2></div>
+    <div class="info">Enter your <strong>Gemini key</strong> to preview AI-generated content. Stored only in your browser — never sent anywhere except Google.</div>
+
+    <label>Gemini API Key (preview only)</label>
+    <input type="password" id="gKey" placeholder="AIzaSy..." oninput="saveKeys()">
+
+    <div class="g2">
+      <div>
+        <label>Content Niche</label>
+        <select id="niche" onchange="onNiche()">
+          <option value="motivation">💪 Motivation</option>
+          <option value="fitness and health">🏋️ Fitness & Health</option>
+          <option value="personal finance">💰 Personal Finance</option>
+          <option value="crypto and investing">📈 Crypto & Investing</option>
+          <option value="tech tips and tricks">💻 Tech Tips</option>
+          <option value="productivity hacks">⏰ Productivity</option>
+          <option value="mindset and success">🧠 Mindset & Success</option>
+          <option value="cooking and food">🍳 Cooking & Food</option>
+          <option value="gaming highlights">🎮 Gaming</option>
+          <option value="travel">✈️ Travel</option>
+          <option value="business and entrepreneurship">🚀 Business</option>
+          <option value="fashion and style">👗 Fashion</option>
+          <option value="custom">✏️ Custom…</option>
+        </select>
+      </div>
+      <div>
+        <label>Voiceover Voice</label>
+        <select id="voice">
+          <option value="en-US-JennyNeural">Jenny – US Female, warm</option>
+          <option value="en-US-GuyNeural">Guy – US Male, natural</option>
+          <option value="en-US-AriaNeural">Aria – US Female, news</option>
+          <option value="en-GB-SoniaNeural">Sonia – UK Female</option>
+          <option value="en-AU-NatashaNeural">Natasha – AU Female</option>
+          <option value="en-US-DavisNeural">Davis – US Male, casual</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="customWrap" style="display:none">
+      <label>Your Custom Niche</label>
+      <input type="text" id="customNiche" placeholder="e.g. dog training, chess, origami">
+    </div>
+
+    <button class="btn btn-purple" id="genBtn" onclick="generate()">
+      ✨ Generate Content Preview <span class="spin" id="sp1"></span>
+    </button>
+    <div style="height:12px"></div>
+
+    <div class="preview" id="pTitle"><div class="preview-lbl">📌 Title</div><p id="tTitle"></p></div>
+    <div class="preview" id="pScript"><div class="preview-lbl">🎙️ Voiceover Script</div><p id="tScript"></p></div>
+    <div class="preview" id="pDesc"><div class="preview-lbl">📝 YouTube Description</div><p id="tDesc"></p></div>
+    <div class="preview" id="pTags"><div class="preview-lbl">🏷️ Tags</div><div class="tags" id="tTags"></div></div>
+  </div>
+
+  <!-- STEP 3 -->
+  <div class="card">
+    <div class="card-head"><div class="step">3</div><h2>Upload Schedule</h2></div>
+    <div class="info">Pick 2–3 slots. GitHub runs automatically at these times every day. YouTube quota resets at <strong>midnight Pacific Time</strong>.</div>
+    <div class="g3" style="margin-bottom:14px">
+      <div class="slot">
+        <label>SLOT 1</label>
+        <input type="time" id="t1" value="09:00">
+        <div class="slot-toggle"><input type="checkbox" id="e1" checked> Enable</div>
+      </div>
+      <div class="slot">
+        <label>SLOT 2</label>
+        <input type="time" id="t2" value="14:00">
+        <div class="slot-toggle"><input type="checkbox" id="e2" checked> Enable</div>
+      </div>
+      <div class="slot">
+        <label>SLOT 3</label>
+        <input type="time" id="t3" value="20:00">
+        <div class="slot-toggle"><input type="checkbox" id="e3" checked> Enable</div>
+      </div>
+    </div>
+    <div class="g2">
+      <div>
+        <label>Your Timezone</label>
+        <select id="tz">
+          <option value="4">🇦🇪 Dubai (UTC+4)</option>
+          <option value="-5">🇺🇸 New York (UTC-5)</option>
+          <option value="-8">🇺🇸 Los Angeles (UTC-8)</option>
+          <option value="0">🇬🇧 London (UTC+0)</option>
+          <option value="1">🇩🇪 Berlin (UTC+1)</option>
+          <option value="9">🇯🇵 Tokyo (UTC+9)</option>
+          <option value="5.5">🇮🇳 India (UTC+5:30)</option>
+          <option value="10">🇦🇺 Sydney (UTC+10)</option>
+          <option value="8">🇸🇬 Singapore (UTC+8)</option>
+        </select>
+      </div>
+      <div>
+        <label>Pexels API Key</label>
+        <input type="password" id="pKey" placeholder="Your Pexels key" oninput="saveKeys()">
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 4 -->
+  <div class="card">
+    <div class="card-head"><div class="step">4</div><h2>Download Your Automation Kit</h2></div>
+    <div class="info">Downloads a <strong>.zip</strong> with all 6 files pre-configured. Push to GitHub → add 4 secrets → done. It posts forever.</div>
+    <button class="btn btn-red btn-full" id="dlBtn" onclick="dlKit()">
+      📦 Download Automation Kit (.zip) <span class="spin" id="sp2"></span>
+    </button>
+  </div>
+
+  <!-- STEP 5 -->
+  <div class="card">
+    <div class="card-head"><div class="step">5</div><h2>GitHub Setup Guide (~10 min)</h2></div>
+    <ol class="steps">
+      <li>
+        <strong>Create a public GitHub repo</strong> —
+        <a href="https://github.com/new" target="_blank">github.com/new</a> → name: <code>yt-shorts-bot</code> → set <strong>Public</strong> (= unlimited free minutes) → Create repository.
+      </li>
+      <li>
+        <strong>Push the kit files</strong> — Extract the downloaded ZIP. Push all files to your repo.
+        The <code>.github/workflows/shorts.yml</code> file is what triggers the schedule.
+      </li>
+      <li>
+        <strong>YouTube OAuth (once, on your computer)</strong> —
+        Go to <a href="https://console.cloud.google.com" target="_blank">Google Cloud Console</a> → create project → enable YouTube Data API v3 →
+        Credentials → Create OAuth 2.0 Client ID (type: <strong>Desktop app</strong>) → Download JSON → rename to <code>client_secrets.json</code>.
+        Then run: <code>pip install -r requirements.txt</code> then <code>python setup_auth.py</code>.
+        A browser opens, sign in with your YouTube channel → copy the printed JSON.
+      </li>
+      <li>
+        <strong>Add 4 GitHub Secrets</strong> — Your repo → Settings → Secrets and variables → Actions → New secret:
+        <br>• <code>GEMINI_API_KEY</code> — from Google AI Studio
+        <br>• <code>PEXELS_API_KEY</code> — from Pexels
+        <br>• <code>YOUTUBE_TOKEN_JSON</code> — full JSON from step above
+        <br>• <code>DEFAULT_NICHE</code> — e.g. <code>motivation</code>
+      </li>
+      <li>
+        <strong>Test it now</strong> — Go to your repo's <strong>Actions</strong> tab →
+        "🎬 YouTube Shorts Automator" → "Run workflow" → Run.
+        Wait ~5 minutes → check your YouTube channel.
+      </li>
+      <li>
+        <strong>Done — it runs forever.</strong>
+        GitHub's servers create and upload 2–3 Shorts per day at your scheduled times.
+        Phone off, laptop off — doesn't matter.
+      </li>
+    </ol>
+  </div>
+
+</div>
+<div class="footer">✅ All tools are 100% free · Stays within daily free limits · No subscriptions · No hidden costs</div>
+
+<script>
+// ── STATE
+let content = null;
+
+window.onload = () => {
+  document.getElementById('gKey').value = localStorage.getItem('gk') || '';
+  document.getElementById('pKey').value = localStorage.getItem('pk') || '';
+};
+
+function saveKeys() {
+  const g = document.getElementById('gKey').value;
+  const p = document.getElementById('pKey').value;
+  if (g) localStorage.setItem('gk', g);
+  if (p) localStorage.setItem('pk', p);
+}
+
+function onNiche() {
+  const v = document.getElementById('niche').value;
+  document.getElementById('customWrap').style.display = v === 'custom' ? 'block' : 'none';
+}
+
+function getNiche() {
+  const v = document.getElementById('niche').value;
+  return v === 'custom' ? (document.getElementById('customNiche').value.trim() || 'motivation') : v;
+}
+
+// ── GENERATE PREVIEW via Gemini
+async function generate() {
+  const key = document.getElementById('gKey').value.trim();
+  if (!key) { alert('Enter your Gemini API key first (Step 1)'); return; }
+
+  const btn = document.getElementById('genBtn');
+  const spin = document.getElementById('sp1');
+  btn.disabled = true; spin.classList.add('on');
+
+  try {
+    const niche = getNiche();
+    const prompt = `You are a viral YouTube Shorts creator. Generate content for the "${niche}" niche.
+Return ONLY valid JSON, no markdown:
+{
+  "title": "Hook-driven title under 60 chars",
+  "script": "Voiceover 110-130 words. Strong hook. Real value. End with CTA.",
+  "description": "3-4 sentence YouTube description + 5 hashtags including #Shorts at end",
+  "tags": ["tag1","tag2","tag3","tag4","tag5","tag6","tag7","tag8"],
+  "pexels_keyword": "2-3 word Pexels video search term"
+}`;
+
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`,
+      { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ contents:[{parts:[{text:prompt}]}], generationConfig:{temperature:0.9,maxOutputTokens:1024} }) }
+    );
+    if (!res.ok) { const e = await res.json(); throw new Error(e.error?.message || `HTTP ${res.status}`); }
+
+    const data = await res.json();
+    let raw = data.candidates[0].content.parts[0].text.trim();
+    // Strip markdown code fences if present
+    const lines = raw.split('\n');
+    const start = lines.findIndex(l => l.trim().startsWith('{'));
+    const end = lines.length - 1 - [...lines].reverse().findIndex(l => l.trim().endsWith('}'));
+    raw = lines.slice(start, end + 1).join('\n');
+    content = JSON.parse(raw);
+    content.voice = document.getElementById('voice').value;
+
+    document.getElementById('tTitle').textContent = content.title;
+    document.getElementById('tScript').textContent = content.script;
+    document.getElementById('tDesc').textContent = content.description;
+    document.getElementById('tTags').innerHTML = (content.tags||[]).map(t=>`<span class="tag">#${t}</span>`).join('');
+    ['pTitle','pScript','pDesc','pTags'].forEach(id => document.getElementById(id).classList.add('show'));
+
+  } catch(e) {
+    alert('Error: ' + e.message + '\n\nDouble-check your Gemini API key.');
+  } finally { btn.disabled=false; spin.classList.remove('on'); }
+}
+
+// ── CONVERT LOCAL TIME → UTC CRON
+function toCron(timeStr, offsetStr) {
+  const [h, m] = timeStr.split(':').map(Number);
+  const off = parseFloat(offsetStr);
+  const offH = Math.floor(Math.abs(off)) * Math.sign(off);
+  const offM = off % 1 !== 0 ? 30 : 0;
+  let utcM = (m - offM + 60) % 60;
+  let carry = (offM > 0 && m < offM) ? 1 : 0;
+  let utcH = ((h - offH - carry) % 24 + 24) % 24;
+  return `${utcM} ${utcH} * * *`;
+}
+
+// ── DOWNLOAD KIT
+async function dlKit() {
+  const slots = [
+    {e: document.getElementById('e1').checked, t: document.getElementById('t1').value},
+    {e: document.getElementById('e2').checked, t: document.getElementById('t2').value},
+    {e: document.getElementById('e3').checked, t: document.getElementById('t3').value},
+  ].filter(s => s.e);
+
+  if (!slots.length) { alert('Enable at least one time slot'); return; }
+
+  const tz = document.getElementById('tz').value;
+  const niche = getNiche();
+  const voice = document.getElementById('voice').value;
+  const btn = document.getElementById('dlBtn');
+  const spin = document.getElementById('sp2');
+  btn.disabled = true; spin.classList.add('on');
+
+  try {
+    const cronLines = slots.map(s => `    - cron: '${toCron(s.t, tz)}'  # ${s.t} your local time`).join('\n');
+    const zip = new JSZip();
+    zip.file('create_short.py', buildCreateShort(niche, voice));
+    zip.file('setup_auth.py', buildSetupAuth());
+    zip.file('requirements.txt', buildRequirements());
+    zip.file('.github/workflows/shorts.yml', buildWorkflow(cronLines));
+    zip.file('README.md', buildReadme(niche, slots, tz));
+    zip.file('.gitignore', 'token.json\nclient_secrets.json\n*.pyc\n__pycache__/\n.env\n*.mp4\n*.mp3\n');
+
+    const blob = await zip.generateAsync({type:'blob'});
+    const url = URL.createObjectURL(blob);
+    const a = Object.assign(document.createElement('a'), {href:url, download:'yt-shorts-automator.zip'});
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch(e) {
+    alert('Error: ' + e.message);
+  } finally { btn.disabled=false; spin.classList.remove('on'); }
+}
+
+// ── FILE BUILDERS
+
+function buildCreateShort(niche, voice) {
+return `#!/usr/bin/env python3
+"""
+create_short.py - YouTube Shorts Automator
+===================================================
+100% Free Stack:
+  Gemini 1.5 Flash  -> 1,500 req/day free (no CC)
+  Pexels API        -> 20,000 req/month free (no CC)
+  edge-tts          -> unlimited free, no key needed
+  FFmpeg            -> open source, pre-installed on GitHub
+  YouTube API v3    -> 10,000 units/day free (~6 uploads)
+===================================================
+"""
+
+import os, sys, json, asyncio, subprocess, re, time, tempfile
+from pathlib import Path
+import requests
+
+GEMINI_KEY  = os.environ.get("GEMINI_API_KEY", "")
+PEXELS_KEY  = os.environ.get("PEXELS_API_KEY", "")
+YT_CREDS    = os.environ.get("YOUTUBE_TOKEN_JSON", "")
+NICHE       = os.environ.get("NICHE", "${niche}")
+VOICE       = os.environ.get("VOICE", "${voice}")
+MAX_SEC     = 58  # Shorts must be < 60 seconds
+
+
+# ── 1. GENERATE CONTENT (Gemini 1.5 Flash) ──────────────────────────────────
+def generate_content(niche):
+    url = (
+        "https://generativelanguage.googleapis.com/v1beta"
+        "/models/gemini-1.5-flash:generateContent?key=" + GEMINI_KEY
+    )
+    prompt = (
+        f'You are a viral YouTube Shorts creator. '
+        f'Create content for the "{niche}" niche.\\n\\n'
+        'Return ONLY valid JSON (no markdown):\\n'
+        '{\\n'
+        '  "title": "Hook-driven title under 60 chars",\\n'
+        '  "script": "Voiceover 110-130 words. Strong hook. Real value. CTA at end.",\\n'
+        '  "description": "3-4 sentence description + 5 hashtags including #Shorts",\\n'
+        '  "tags": ["tag1","tag2","tag3","tag4","tag5","tag6","tag7","tag8"],\\n'
+        '  "pexels_keyword": "2-3 word Pexels video search term"\\n'
+        '}'
+    )
+    r = requests.post(
+        url,
+        json={"contents": [{"parts": [{"text": prompt}]}],
+              "generationConfig": {"temperature": 0.9, "maxOutputTokens": 1024}},
+        timeout=30
+    )
+    r.raise_for_status()
+    raw = r.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+
+    # Strip markdown code fences if Gemini wraps the response
+    lines = raw.split("\\n")
+    start = next((i for i, l in enumerate(lines) if l.strip().startswith("{")), 0)
+    rev   = list(reversed(lines))
+    end   = len(lines) - 1 - next((i for i, l in enumerate(rev) if l.strip().endswith("}")), 0)
+    raw   = "\\n".join(lines[start:end + 1])
+    return json.loads(raw)
+
+
+# ── 2. FETCH BACKGROUND VIDEO (Pexels) ──────────────────────────────────────
+def get_video(keyword, output):
+    headers = {"Authorization": PEXELS_KEY}
+    for orientation in ("portrait", "landscape"):
+        r = requests.get(
+            "https://api.pexels.com/videos/search",
+            headers=headers,
+            params={"query": keyword, "orientation": orientation,
+                    "per_page": 10, "size": "medium"},
+            timeout=30
+        )
+        if r.status_code != 200:
+            continue
+        for video in r.json().get("videos", [])[:5]:
+            files = sorted(video["video_files"],
+                           key=lambda x: x.get("height", 0), reverse=True)
+            for f in files:
+                if f.get("file_type") == "video/mp4":
+                    print(f"  Found: {video['id']} ({f.get('width')}x{f.get('height')})")
+                    dl = requests.get(f["link"], stream=True, timeout=120)
+                    with open(output, "wb") as fp:
+                        for chunk in dl.iter_content(8192):
+                            fp.write(chunk)
+                    return True
+    return False
+
+
+# ── 3. CREATE VOICEOVER (edge-tts, no API key) ───────────────────────────────
+async def make_voiceover(script, voice, output):
+    import edge_tts
+    await edge_tts.Communicate(script, voice).save(output)
+
+
+# ── 4. BUILD THE SHORT (FFmpeg) ──────────────────────────────────────────────
+def build_short(bg, vo, title, output):
+    # Get voiceover duration
+    probe = subprocess.run(
+        ["ffprobe", "-v", "quiet", "-print_format", "json", "-show_format", vo],
+        capture_output=True, text=True, check=True
+    )
+    dur = min(float(json.loads(probe.stdout)["format"]["duration"]) + 0.3, MAX_SEC)
+
+    # Clean title for FFmpeg drawtext (remove shell-problematic chars)
+    import re as _re
+    safe_title = _re.sub(r"[':=%@#]", "", title)[:55]
+
+    vf = (
+        "scale=1080:1920:force_original_aspect_ratio=increase,"
+        "crop=1080:1920,"
+        "format=yuv420p,"
+        f"drawtext=text='{safe_title}':"
+        "fontsize=48:fontcolor=white:"
+        "x=(w-text_w)/2:y=100:"
+        "box=1:boxcolor=black@0.65:boxborderw=16:"
+        "fontweight=bold"
+    )
+
+    cmd = [
+        "ffmpeg", "-y",
+        "-stream_loop", "-1", "-i", bg,
+        "-i", vo,
+        "-t", str(dur),
+        "-vf", vf,
+        "-af", "loudnorm",
+        "-c:v", "libx264", "-preset", "fast", "-crf", "23",
+        "-c:a", "aac", "-b:a", "128k",
+        "-shortest", "-movflags", "+faststart",
+        output
+    ]
+    res = subprocess.run(cmd, capture_output=True, text=True)
+    if res.returncode != 0:
+        raise RuntimeError("FFmpeg failed:\\n" + res.stderr[-600:])
+    print(f"  Video: {Path(output).stat().st_size / 1024 / 1024:.1f} MB, {dur:.1f}s")
+
+
+# ── 5. UPLOAD TO YOUTUBE (Data API v3) ──────────────────────────────────────
+def upload_to_youtube(path, title, description, tags):
+    from googleapiclient.discovery import build
+    from googleapiclient.http import MediaFileUpload
+    from google.oauth2.credentials import Credentials
+    from google.auth.transport.requests import Request as GReq
+
+    d = json.loads(YT_CREDS)
+    creds = Credentials(
+        token=d.get("token"),
+        refresh_token=d.get("refresh_token"),
+        token_uri=d.get("token_uri", "https://oauth2.googleapis.com/token"),
+        client_id=d.get("client_id"),
+        client_secret=d.get("client_secret"),
+        scopes=d.get("scopes", ["https://www.googleapis.com/auth/youtube.upload"])
+    )
+    if not creds.valid:
+        creds.refresh(GReq())
+
+    yt = build("youtube", "v3", credentials=creds, cache_discovery=False)
+    body = {
+        "snippet": {
+            "title": title[:100],
+            "description": description + "\\n\\n#Shorts",
+            "tags": tags,
+            "categoryId": "22",
+        },
+        "status": {"privacyStatus": "public", "selfDeclaredMadeForKids": False}
+    }
+    media = MediaFileUpload(path, mimetype="video/mp4", resumable=True, chunksize=1024 * 1024)
+    req = yt.videos().insert(part="snippet,status", body=body, media_body=media)
+
+    resp = None
+    while resp is None:
+        status, resp = req.next_chunk()
+        if status:
+            print(f"  Uploading: {int(status.progress() * 100)}%")
+    return resp["id"]
+
+
+# ── MAIN ─────────────────────────────────────────────────────────────────────
+def main():
+    print("\\n🎬 YouTube Shorts Automator")
+    print(f"📌 Niche: {NICHE}  |  Voice: {VOICE}")
+    print(f"🕐 {time.strftime('%Y-%m-%d %H:%M UTC')}\\n")
+
+    missing = [k for k in ("GEMINI_API_KEY", "PEXELS_API_KEY", "YOUTUBE_TOKEN_JSON")
+               if not os.environ.get(k)]
+    if missing:
+        print("❌ Missing GitHub Secrets:", ", ".join(missing))
+        sys.exit(1)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        bg  = f"{tmp}/bg.mp4"
+        vo  = f"{tmp}/vo.mp3"
+        out = f"{tmp}/short.mp4"
+
+        print("1️⃣  Generating content with Gemini Flash...")
+        c = generate_content(NICHE)
+        print(f"   Title:   {c['title']}")
+        print(f"   Keyword: {c['pexels_keyword']}")
+
+        print("2️⃣  Fetching background video from Pexels...")
+        if not get_video(c["pexels_keyword"], bg):
+            print(f"   Retrying with niche keyword: {NICHE}")
+            if not get_video(NICHE, bg):
+                print("   ❌ No video found. Check PEXELS_API_KEY.")
+                sys.exit(1)
+
+        print("3️⃣  Creating voiceover with edge-tts...")
+        asyncio.run(make_voiceover(c["script"], VOICE, vo))
+
+        print("4️⃣  Assembling Short with FFmpeg...")
+        build_short(bg, vo, c["title"], out)
+
+        print("5️⃣  Uploading to YouTube...")
+        vid_id = upload_to_youtube(out, c["title"], c["description"], c.get("tags", []))
+
+        print("\\n✅ SUCCESS!")
+        print(f"   Title : {c['title']}")
+        print(f"   URL   : https://www.youtube.com/shorts/{vid_id}")
+
+
+if __name__ == "__main__":
+    main()
+`;
+}
+
+function buildSetupAuth() {
+return `#!/usr/bin/env python3
+"""
+setup_auth.py - One-Time YouTube OAuth Setup
+Run this ONCE on your LOCAL computer (not on GitHub).
+
+Before running:
+  1. Go to console.cloud.google.com
+  2. Create or select a project
+  3. Enable "YouTube Data API v3"
+  4. APIs and Services > Credentials > Create OAuth 2.0 Client ID
+  5. Application type: Desktop app
+  6. Download the JSON -> save as "client_secrets.json" here
+  7. Run: python setup_auth.py
+  8. Copy the printed JSON to GitHub Secret YOUTUBE_TOKEN_JSON
+"""
+
+import json
+from google_auth_oauthlib.flow import InstalledAppFlow
+
+SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
+
+
+def main():
+    print("=" * 55)
+    print("  YouTube OAuth Setup")
+    print("=" * 55)
+    print("\\nOpening browser — sign in with your YouTube channel...\\n")
+
+    flow = InstalledAppFlow.from_client_secrets_file(
+        "client_secrets.json", scopes=SCOPES
+    )
+    creds = flow.run_local_server(port=8080, open_browser=True)
+
+    token = {
+        "token":         creds.token,
+        "refresh_token": creds.refresh_token,
+        "token_uri":     creds.token_uri,
+        "client_id":     creds.client_id,
+        "client_secret": creds.client_secret,
+        "scopes":        list(creds.scopes),
+    }
+
+    with open("token.json", "w") as f:
+        json.dump(token, f, indent=2)
+
+    print("\\n" + "=" * 55)
+    print("Copy this ENTIRE string to GitHub Secret 'YOUTUBE_TOKEN_JSON':")
+    print("=" * 55)
+    print(json.dumps(token))
+    print("=" * 55)
+    print("\\nWARNING: Never commit token.json or client_secrets.json to Git!")
+    print("Both are already listed in .gitignore.\\n")
+
+
+if __name__ == "__main__":
+    main()
+`;
+}
+
+function buildRequirements() {
+return `# YouTube Shorts Automator - Python dependencies
+# All packages are free and open source
+
+google-generativeai>=0.7.0
+google-api-python-client>=2.100.0
+google-auth-httplib2>=0.2.0
+google-auth-oauthlib>=1.1.0
+requests>=2.31.0
+edge-tts>=6.1.0
+Pillow>=10.0.0
+`;
+}
+
+function buildWorkflow(cronLines) {
+return `name: "\U0001F3AC YouTube Shorts Automator"
+
+on:
+  schedule:
+${cronLines}
+  workflow_dispatch:
+    inputs:
+      niche:
+        description: 'Niche override (blank = use secret DEFAULT_NICHE)'
+        required: false
+        default: ''
+      voice:
+        description: 'Voice override (e.g. en-US-GuyNeural)'
+        required: false
+        default: ''
+
+jobs:
+  upload-short:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: "Checkout"
+        uses: actions/checkout@v4
+
+      - name: "Setup Python 3.11"
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: "Install dependencies"
+        run: pip install -r requirements.txt
+
+      - name: "Create and Upload Short"
+        env:
+          GEMINI_API_KEY:     \${{ secrets.GEMINI_API_KEY }}
+          PEXELS_API_KEY:     \${{ secrets.PEXELS_API_KEY }}
+          YOUTUBE_TOKEN_JSON: \${{ secrets.YOUTUBE_TOKEN_JSON }}
+          NICHE:              \${{ inputs.niche || secrets.DEFAULT_NICHE }}
+          VOICE:              \${{ inputs.voice || '' }}
+        run: python create_short.py
+`;
+}
+
+function buildReadme(niche, slots, tz) {
+  const t = '\`';
+  const tt = t+t+t;
+  const slotList = slots.map((s,i) => `- Slot ${i+1}: ${s.t} (UTC+${tz})`).join('\n');
+  return `# YouTube Shorts Automator
+
+Autonomous YouTube Shorts bot. GitHub Actions creates and uploads Shorts daily at scheduled times.
+Zero cost. Zero maintenance once set up.
+
+## Free Tier Usage
+| Tool | Free Limit | Your Daily Usage |
+|------|-----------|-----------------|
+| Gemini 1.5 Flash | 1,500 req/day | 2-3 |
+| Pexels API | 20,000 req/month | 2-3 |
+| YouTube Data API | 10,000 units/day | ~5,000 |
+| edge-tts | Unlimited | — |
+| GitHub Actions | Unlimited (public) | ~30 min |
+
+## Configuration
+- **Niche**: ${niche}
+- **Schedule**:
+${slotList}
+
+## Setup (10 minutes)
+
+### 1. Get API Keys
+| Service | URL | Cost |
+|---------|-----|------|
+| Gemini | https://aistudio.google.com/app/apikey | Free |
+| Pexels | https://www.pexels.com/api/ | Free |
+| YouTube | Google Cloud Console | Free |
+
+### 2. YouTube Auth (run once on your computer)
+${tt}bash
+pip install -r requirements.txt
+# Save client_secrets.json from Google Cloud first
+python setup_auth.py
+# Copy the printed JSON to GitHub Secret YOUTUBE_TOKEN_JSON
+${tt}
+
+### 3. Add GitHub Secrets
+Repo Settings → Secrets and variables → Actions → New secret:
+- ${t}GEMINI_API_KEY${t}
+- ${t}PEXELS_API_KEY${t}
+- ${t}YOUTUBE_TOKEN_JSON${t} (from step 2)
+- ${t}DEFAULT_NICHE${t} = ${t}${niche}${t}
+
+### 4. Test
+Actions tab → YouTube Shorts Automator → Run workflow → Run
+
+## How It Works
+${tt}
+GitHub Actions (cron schedule)
+  └── create_short.py
+        ├── Gemini Flash  → title + voiceover script + description + tags
+        ├── Pexels API    → relevant background stock video (portrait)
+        ├── edge-tts      → natural neural voiceover (no key needed)
+        ├── FFmpeg        → assembles 1080x1920 Short with title overlay
+        └── YouTube API   → uploads as public Short to your channel
+${tt}
+`;
+}
+</script>
+</body>
+</html>
